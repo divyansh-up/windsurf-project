@@ -39,17 +39,17 @@ export const QuestionSection = ({ questions }: QuestionSectionProps) => {
   };
 
   return (
-    <div className="w-full min-h-96 border rounded-md p-4">
+    <div className="w-full min-h-96 rounded-xl p-5 bg-white shadow-sm">
       <Tabs
         defaultValue={questions[0]?.question}
-        className="w-full space-y-12"
+        className="w-full space-y-10"
         orientation="vertical"
       >
-        <TabsList className="bg-transparent w-full flex flex-wrap items-center justify-start gap-4">
+        <TabsList className="bg-transparent w-full flex flex-wrap items-center justify-start gap-3">
           {questions?.map((tab, i) => (
             <TabsTrigger
               className={cn(
-                "data-[state=active]:bg-emerald-200 data-[state=active]:shadow-md text-xs px-2"
+                "text-xs px-3 py-1.5 rounded-full border transition-colors data-[state=active]:bg-emerald-100 data-[state=active]:border-emerald-200 hover:bg-muted"
               )}
               key={tab.question}
               value={tab.question}
@@ -61,7 +61,7 @@ export const QuestionSection = ({ questions }: QuestionSectionProps) => {
 
         {questions?.map((tab, i) => (
           <TabsContent key={i} value={tab.question}>
-            <p className="text-base text-left tracking-wide text-neutral-500">
+            <p className="text-base text-left tracking-wide text-neutral-700">
               {tab.question}
             </p>
 

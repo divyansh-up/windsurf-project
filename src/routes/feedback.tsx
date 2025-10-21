@@ -10,7 +10,7 @@ import {
   where,
 } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { LoaderPage } from "./loader-page";
 import { CustomBreadCrumb } from "@/components/custom-bread-crumb";
@@ -36,7 +36,7 @@ export const Feedback = () => {
   const navigate = useNavigate();
 
   if (!interviewId) {
-    navigate("/generate", { replace: true });
+    return <Navigate to="/generate" replace />;
   }
   useEffect(() => {
     if (interviewId) {
@@ -101,6 +101,42 @@ export const Feedback = () => {
     return (totalRatings / feedbacks.length).toFixed(1);
   }, [feedbacks]);
 
+  const metricsAverages = useMemo(() => {
+    if (feedbacks.length === 0) {
+      return {
+        content_relevance: "0.0",
+        fluency: "0.0",
+        tone: "0.0",
+        clarity: "0.0",
+      };
+    }
+
+    const safe = (n: number | undefined) => (typeof n === "number" ? n : 0);
+
+    const sum = feedbacks.reduce(
+      (acc, f) => {
+        acc.content_relevance += safe(f.content_relevance);
+        acc.fluency += safe(f.fluency);
+        acc.tone += safe(f.tone);
+        acc.clarity += safe(f.clarity);
+        return acc;
+      },
+      { content_relevance: 0, fluency: 0, tone: 0, clarity: 0 }
+    );
+
+    const countCR = feedbacks.filter((f) => typeof f.content_relevance === "number").length || feedbacks.length;
+    const countFl = feedbacks.filter((f) => typeof f.fluency === "number").length || feedbacks.length;
+    const countTo = feedbacks.filter((f) => typeof f.tone === "number").length || feedbacks.length;
+    const countCl = feedbacks.filter((f) => typeof f.clarity === "number").length || feedbacks.length;
+
+    return {
+      content_relevance: (sum.content_relevance / countCR).toFixed(1),
+      fluency: (sum.fluency / countFl).toFixed(1),
+      tone: (sum.tone / countTo).toFixed(1),
+      clarity: (sum.clarity / countCl).toFixed(1),
+    };
+  }, [feedbacks]);
+
   if (isLoading) {
     return <LoaderPage className="w-full h-[70vh]" />;
   }
@@ -125,12 +161,38 @@ export const Feedback = () => {
         description="Your personalized feedback is now available. Dive in to see your strengths, areas for improvement, and tips to help you ace your next interview."
       />
 
-      <p className="text-base text-muted-foreground">
-        Your overall interview ratings :{" "}
-        <span className="text-emerald-500 font-semibold text-xl">
-          {overAllRating} / 10
-        </span>
-      </p>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card className="p-4 shadow-sm border rounded-lg">
+          <CardTitle className="text-sm text-gray-600">Overall</CardTitle>
+          <CardDescription className="text-emerald-600 text-2xl font-semibold">
+            {overAllRating} / 10
+          </CardDescription>
+        </Card>
+        <Card className="p-4 shadow-sm border rounded-lg">
+          <CardTitle className="text-sm text-gray-600">Content Relevance</CardTitle>
+          <CardDescription className="text-gray-800 text-xl font-semibold">
+            {metricsAverages.content_relevance} / 10
+          </CardDescription>
+        </Card>
+        <Card className="p-4 shadow-sm border rounded-lg">
+          <CardTitle className="text-sm text-gray-600">Fluency</CardTitle>
+          <CardDescription className="text-gray-800 text-xl font-semibold">
+            {metricsAverages.fluency} / 10
+          </CardDescription>
+        </Card>
+        <Card className="p-4 shadow-sm border rounded-lg">
+          <CardTitle className="text-sm text-gray-600">Tone</CardTitle>
+          <CardDescription className="text-gray-800 text-xl font-semibold">
+            {metricsAverages.tone} / 10
+          </CardDescription>
+        </Card>
+        <Card className="p-4 shadow-sm border rounded-lg">
+          <CardTitle className="text-sm text-gray-600">Clarity</CardTitle>
+          <CardDescription className="text-gray-800 text-xl font-semibold">
+            {metricsAverages.clarity} / 10
+          </CardDescription>
+        </Card>
+      </div>
 
       {interview && <InterviewPin interview={interview} onMockPage />}
 
@@ -160,6 +222,33 @@ export const Feedback = () => {
                 <div className="text-lg font-semibold to-gray-700">
                   <Star className="inline mr-2 text-yellow-400" />
                   Rating : {feed.rating}
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Card className="border-none p-3 bg-sky-50 rounded-lg">
+                    <CardTitle className="text-sm">Content Rel.</CardTitle>
+                    <CardDescription className="text-base font-medium">
+                      {typeof feed.content_relevance === "number" ? feed.content_relevance : "-"}
+                    </CardDescription>
+                  </Card>
+                  <Card className="border-none p-3 bg-sky-50 rounded-lg">
+                    <CardTitle className="text-sm">Fluency</CardTitle>
+                    <CardDescription className="text-base font-medium">
+                      {typeof feed.fluency === "number" ? feed.fluency : "-"}
+                    </CardDescription>
+                  </Card>
+                  <Card className="border-none p-3 bg-sky-50 rounded-lg">
+                    <CardTitle className="text-sm">Tone</CardTitle>
+                    <CardDescription className="text-base font-medium">
+                      {typeof feed.tone === "number" ? feed.tone : "-"}
+                    </CardDescription>
+                  </Card>
+                  <Card className="border-none p-3 bg-sky-50 rounded-lg">
+                    <CardTitle className="text-sm">Clarity</CardTitle>
+                    <CardDescription className="text-base font-medium">
+                      {typeof feed.clarity === "number" ? feed.clarity : "-"}
+                    </CardDescription>
+                  </Card>
                 </div>
 
                 <Card className="border-none space-y-3 p-4 bg-green-50 rounded-lg shadow-md">

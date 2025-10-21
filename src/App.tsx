@@ -6,6 +6,12 @@ import ProtectRoutes from "@/layouts/protected-routes";
 import { MainLayout } from "@/layouts/main-layout";
 
 import HomePage from "@/routes/home";
+import ContactPage from "@/routes/contact";
+import AboutPage from "@/routes/about";
+import ServicesPage from "@/routes/services";
+import TakeInterview from "@/routes/take-interview";
+import VapiInterview from "@/routes/vapi-interview";
+import ResumeAnalyzer from "@/routes/resume-analyzer";
 import { SignInPage } from "./routes/sign-in";
 import { SignUpPage } from "./routes/sign-up";
 import { Generate } from "./components/generate";
@@ -22,6 +28,13 @@ const App = () => {
         {/* public routes */}
         <Route element={<PublicLayout />}>
           <Route index element={<HomePage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/services" element={<ServicesPage />} />
+          <Route path="/resume-analyzer" element={<ResumeAnalyzer />} />
+          <Route path="/take-interview" element={<TakeInterview />} />
+          <Route path="/vapi-interview" element={<VapiInterview />} />
+          <Route path="/machine-interview" element={<VapiInterview />} />
         </Route>
 
         {/* authentication layout */}
@@ -41,6 +54,7 @@ const App = () => {
           {/* add all the protect routes */}
           <Route element={<Generate />} path="/generate">
             <Route index element={<Dashboard />} />
+            <Route path="create" element={<CreateEditPage />} />
             <Route path=":interviewId" element={<CreateEditPage />} />
             <Route path="interview/:interviewId" element={<MockLoadPage />} />
             <Route

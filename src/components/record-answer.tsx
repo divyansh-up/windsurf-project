@@ -37,6 +37,10 @@ interface RecordAnswerProps {
 interface AIResponse {
   ratings: number;
   feedback: string;
+  content_relevance: number;
+  fluency: number;
+  tone: number;
+  clarity: number;
 }
 
 export const RecordAnswer = ({
@@ -50,6 +54,7 @@ export const RecordAnswer = ({
     results,
     startSpeechToText,
     stopSpeechToText,
+    error,
   } = useSpeechToText({
     continuous: true,
     useLegacyResults: false,
@@ -85,6 +90,16 @@ export const RecordAnswer = ({
 
       setAiResult(aiResult);
     } else {
+      try {
+        // Pre-warm microphone permission to avoid silent failures in some browsers
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        toast.error("Microphone blocked", {
+          description:
+            "Please allow microphone access in your browser and try again.",
+        });
+        return;
+      }
       startSpeechToText();
     }
   };
@@ -96,7 +111,7 @@ export const RecordAnswer = ({
     // Step 2: Remove any occurrences of "json" or code block symbols (``` or `)
     cleanText = cleanText.replace(/(json|```|`)/g, "");
 
-    // Step 3: Parse the clean JSON text into an array of objects
+    // Step 3: Parse the clean JSON text into an object
     try {
       return JSON.parse(cleanText);
     } catch (error) {
@@ -111,11 +126,28 @@ export const RecordAnswer = ({
   ): Promise<AIResponse> => {
     setIsAiGenerating(true);
     const prompt = `
+      You are evaluating a mock interview response.
+      Provide concise, structured scoring on the following dimensions from 1 to 10:
+      - content_relevance: How well the answer addresses the key points in the correct answer.
+      - fluency: Speech/answer flow and coherence.
+      - tone: Professional and confident tone appropriateness.
+      - clarity: Clarity and organization of the answer.
+
+      Also provide an overall ratings (1-10) and a short actionable feedback string.
+
+      Return ONLY valid JSON (no comments, code fences, or markdown). Keys must be:
+      {
+        "ratings": number,
+        "feedback": string,
+        "content_relevance": number,
+        "fluency": number,
+        "tone": number,
+        "clarity": number
+      }
+
       Question: "${qst}"
-      User Answer: "${userAns}"
       Correct Answer: "${qstAns}"
-      Please compare the user's answer to the correct answer, and provide a rating (from 1 to 10) based on answer quality, and offer feedback for improvement.
-      Return the result in JSON format with the fields "ratings" (number) and "feedback" (string).
+      User Answer: "${userAns}"
     `;
 
     try {
@@ -130,7 +162,14 @@ export const RecordAnswer = ({
       toast("Error", {
         description: "An error occurred while generating feedback.",
       });
-      return { ratings: 0, feedback: "Unable to generate feedback" };
+      return {
+        ratings: 0,
+        feedback: "Unable to generate feedback",
+        content_relevance: 0,
+        fluency: 0,
+        tone: 0,
+        clarity: 0,
+      };
     } finally {
       setIsAiGenerating(false);
     }
@@ -178,6 +217,10 @@ export const RecordAnswer = ({
           user_ans: userAnswer,
           feedback: aiResult.feedback,
           rating: aiResult.ratings,
+          content_relevance: aiResult.content_relevance,
+          fluency: aiResult.fluency,
+          tone: aiResult.tone,
+          clarity: aiResult.clarity,
           userId,
           createdAt: serverTimestamp(),
         });
@@ -217,19 +260,19 @@ export const RecordAnswer = ({
         loading={loading}
       />
 
-      <div className="w-full h-[400px] md:w-96 flex flex-col items-center justify-center border p-4 bg-gray-50 rounded-md">
+      <div className="w-full h-[400px] md:w-[560px] flex flex-col items-center justify-center rounded-xl border bg-muted/30 p-4 shadow-sm">
         {isWebCam ? (
           <WebCam
             onUserMedia={() => setIsWebCam(true)}
             onUserMediaError={() => setIsWebCam(false)}
-            className="w-full h-full object-cover rounded-md"
+            className="w-full h-full object-cover rounded-lg"
           />
         ) : (
           <WebcamIcon className="min-w-24 min-h-24 text-muted-foreground" />
         )}
       </div>
 
-      <div className="flex itece justify-center gap-3">
+      <div className="flex items-center justify-center gap-3">
         <TooltipButton
           content={isWebCam ? "Turn Off" : "Turn On"}
           icon={
@@ -274,11 +317,11 @@ export const RecordAnswer = ({
         />
       </div>
 
-      <div className="w-full mt-4 p-4 border rounded-md bg-gray-50">
+      <div className="w-full mt-4 p-5 rounded-xl bg-white shadow-sm border">
         <h2 className="text-lg font-semibold">Your Answer:</h2>
 
         <p className="text-sm mt-2 text-gray-700 whitespace-normal">
-          {userAnswer || "Start recording to see your ansewer here"}
+          {userAnswer || "Start recording to see your answer here"}
         </p>
 
         {interimResult && (
@@ -286,6 +329,56 @@ export const RecordAnswer = ({
             <strong>Current Speech:</strong>
             {interimResult}
           </p>
+        )}
+
+        {isRecording && (
+          <p className="text-xs text-emerald-600 mt-2">Recording… Speak now.</p>
+        )}
+
+        {error && (
+          <p className="text-xs text-red-600 mt-2">
+            Speech error: {String(error)}. Ensure you are using Chrome on
+            localhost or HTTPS and microphone permission is allowed.
+          </p>
+        )}
+
+        {aiResult && (
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div className="p-3 rounded-lg border bg-emerald-50">
+              <p className="text-sm text-gray-600">Overall</p>
+              <p className="text-emerald-700 text-xl font-semibold">
+                {aiResult.ratings} / 10
+              </p>
+            </div>
+            <div className="p-3 rounded-lg border bg-sky-50">
+              <p className="text-sm text-gray-600">Content Rel.</p>
+              <p className="text-gray-800 text-lg font-semibold">
+                {aiResult.content_relevance}
+              </p>
+            </div>
+            <div className="p-3 rounded-lg border bg-sky-50">
+              <p className="text-sm text-gray-600">Fluency</p>
+              <p className="text-gray-800 text-lg font-semibold">
+                {aiResult.fluency}
+              </p>
+            </div>
+            <div className="p-3 rounded-lg border bg-sky-50">
+              <p className="text-sm text-gray-600">Tone</p>
+              <p className="text-gray-800 text-lg font-semibold">
+                {aiResult.tone}
+              </p>
+            </div>
+            <div className="p-3 rounded-lg border bg-sky-50">
+              <p className="text-sm text-gray-600">Clarity</p>
+              <p className="text-gray-800 text-lg font-semibold">
+                {aiResult.clarity}
+              </p>
+            </div>
+            <div className="md:col-span-5 p-3 rounded-lg border bg-yellow-50">
+              <p className="text-sm text-gray-700 font-medium">Feedback</p>
+              <p className="text-gray-800 text-sm mt-1">{aiResult.feedback}</p>
+            </div>
+          </div>
         )}
       </div>
     </div>

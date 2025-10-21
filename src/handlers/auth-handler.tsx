@@ -7,8 +7,15 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const AuthHanlder = () => {
-  const { isSignedIn } = useAuth();
-  const { user } = useUser();
+  let isSignedIn = false;
+  let user: ReturnType<typeof useUser>["user"] | null = null;
+  try {
+    isSignedIn = useAuth()?.isSignedIn ?? false;
+    user = useUser()?.user ?? null;
+  } catch {
+    // Clerk not available; render nothing and skip user sync
+    return null;
+  }
 
   const pathname = useLocation().pathname;
   const navigate = useNavigate();

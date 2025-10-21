@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Interview } from "@/types";
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { LoaderPage } from "./loader-page";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/config/firebase.config";
@@ -47,15 +47,15 @@ export const MockInterviewPage = () => {
   }
 
   if (!interviewId) {
-    navigate("/generate", { replace: true });
+    return <Navigate to="/generate" replace />;
   }
 
   if (!interview) {
-    navigate("/generate", { replace: true });
+    return <Navigate to="/generate" replace />;
   }
 
   return (
-    <div className="flex flex-col w-full gap-8 py-5">
+    <div className="flex flex-col w-full max-w-5xl mx-auto gap-8 py-6">
       <CustomBreadCrumb
         breadCrumbPage="Start"
         breadCrumpItems={[
@@ -68,13 +68,13 @@ export const MockInterviewPage = () => {
       />
 
       <div className="w-full">
-        <Alert className="bg-sky-100 border border-sky-200 p-4 rounded-lg flex items-start gap-3">
-          <Lightbulb className="h-5 w-5 text-sky-600" />
+        <Alert className="p-5 rounded-xl flex items-start gap-3 border-none bg-gradient-to-r from-sky-50 to-emerald-50 shadow-sm">
+          <Lightbulb className="h-5 w-5 text-sky-700" />
           <div>
-            <AlertTitle className="text-sky-800 font-semibold">
+            <AlertTitle className="text-sky-900 font-semibold">
               Important Note
             </AlertTitle>
-            <AlertDescription className="text-sm text-sky-700 mt-1 leading-relaxed">
+            <AlertDescription className="text-sm text-sky-800 mt-1 leading-relaxed">
               Press "Record Answer" to begin answering the question. Once you
               finish the interview, you&apos;ll receive feedback comparing your
               responses with the ideal answers.
@@ -89,7 +89,7 @@ export const MockInterviewPage = () => {
       </div>
 
       {interview?.questions && interview?.questions.length > 0 && (
-        <div className="mt-4 w-full flex flex-col items-start gap-4">
+        <div className="mt-2 w-full flex flex-col items-start gap-4">
           <QuestionSection questions={interview?.questions} />
         </div>
       )}

@@ -63,9 +63,12 @@ export const Footer = () => {
           <div>
             <h3 className="font-bold text-lg mb-4">About Us</h3>
             <p>
-              We are committed to helping you unlock your full potential with
-              AI-powered tools. Our platform offers a wide range of resources to
-              improve your interview skills and chances of success.
+              INTERVIEWER HUB is a smart, AI-powered mock interview platform.
+              Led by <span className="font-semibold">Anubhav Singh</span> with team members
+              <span className="font-semibold"> Deepak Som</span>,
+              <span className="font-semibold"> Divyansh Agarwal</span>, and
+              <span className="font-semibold"> Anubhav Tyagi</span>.
+              Practice domain-specific questions and get instant, multi-metric feedback to improve faster.
             </p>
           </div>
 
@@ -88,7 +91,13 @@ export const Footer = () => {
           {/* Fourth Column: Address and Social Media */}
           <div>
             <h3 className="font-bold text-lg mb-4">Contact Us</h3>
-            <p className="mb-4">123 AI Street, Tech City, 12345</p>
+            <p className="mb-1">Meerut, India</p>
+            <a
+              href="mailto:anubhav.singh.cse.20222miet.ac.in"
+              className="mb-4 inline-block hover:underline"
+            >
+              anubhav.singh.cse.20222miet.ac.in
+            </a>
             <div className="flex gap-4">
               <SocialLink
                 href="https://facebook.com"
