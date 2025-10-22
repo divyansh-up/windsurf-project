@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import useSpeechToText from "react-hook-speech-to-text";
 import { chatSession } from "@/scripts";
-import { Mic, MicOff, RefreshCw, Rocket, Sparkles, Loader } from "lucide-react";
+import { Mic, MicOff, RefreshCw, Rocket, Sparkles, Loader, Bot } from "lucide-react";
 import { computeScoresFromSummary, loadHistory, saveSession, type ScoreBundle } from "@/lib/analytics";
 import { AnalyticsRadar } from "@/components/analytics-radar";
 
@@ -59,6 +59,7 @@ function generateQuestions(domain: string, topic: string, count: number): string
 }
 
 const defaultCount = 5;
+const QUESTION_TIME_SEC = Number(import.meta.env.VITE_QUESTION_TIME_SEC || 120);
 
 const TakeInterview = () => {
   const [searchParams] = useSearchParams();
@@ -82,6 +83,8 @@ const TakeInterview = () => {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const suppressInterimRef = useRef<boolean>(false);
   const interimIdxRef = useRef<number>(0);
+  const [secondsLeft, setSecondsLeft] = useState<number>(QUESTION_TIME_SEC);
+  const timerRef = useRef<number | null>(null);
   
 
   // Speech-to-text (optional voice input)
@@ -104,6 +107,62 @@ const TakeInterview = () => {
     if (!started || questions.length === 0) return "";
     return `Question ${currentIdx + 1} of ${questions.length}`;
   }, [started, currentIdx, questions.length]);
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  };
+
+  const onTimeExpire = () => {
+    if (isRecording) {
+      stopSpeechToText();
+    }
+    if (autoStopTimer) window.clearTimeout(autoStopTimer);
+    setAutoStopTimer(null);
+    // Advance or finish
+    if (currentIdx < questions.length - 1) {
+      setCurrentIdx((i) => Math.min(questions.length - 1, i + 1));
+    } else {
+      onFinish();
+    }
+  };
+
+  // Per-question countdown: resets when question changes or interview starts
+  useEffect(() => {
+    if (!started || questions.length === 0 || feedback) return;
+    // reset timer for the active question
+    setSecondsLeft(QUESTION_TIME_SEC);
+    if (timerRef.current) window.clearInterval(timerRef.current);
+    timerRef.current = window.setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s <= 1) {
+          // time up
+          if (timerRef.current) {
+            window.clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          // defer expire to next tick to avoid state update within render
+          setTimeout(onTimeExpire, 0);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => {
+      if (timerRef.current) {
+        window.clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [started, currentIdx, questions.length, feedback]);
+
+  // Clear timer on unmount/end
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) window.clearInterval(timerRef.current);
+    };
+  }, []);
 
   // Apply transcript to current answer
   useEffect(() => {
@@ -177,6 +236,7 @@ const TakeInterview = () => {
     setCurrentIdx(0);
     setFeedback("");
     setStarted(true);
+    setSecondsLeft(QUESTION_TIME_SEC);
   };
 
   // Navigation
@@ -300,9 +360,16 @@ const TakeInterview = () => {
     <div className="relative w-full min-h-screen overflow-hidden">
       {/* Animated soft gradient background */}
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-200/40 blur-[80px] animate-pulse" />
-        <div className="absolute top-1/3 -right-24 h-72 w-72 rounded-full bg-cyan-200/40 blur-[80px] animate-pulse [animation-delay:200ms]" />
+        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-300/35 blur-[80px] animate-pulse" />
+        <div className="absolute top-1/3 -right-24 h-72 w-72 rounded-full bg-cyan-300/35 blur-[80px] animate-pulse [animation-delay:200ms]" />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 h-80 w-[36rem] rounded-[3rem] bg-gradient-to-r from-indigo-200/30 via-white/20 to-cyan-200/30 blur-3xl opacity-70 animate-pulse [animation-delay:400ms]" />
       </div>
+      {/* Minimal decorative illustration */}
+      {!started && (
+        <div className="pointer-events-none absolute right-10 bottom-10 opacity-20 hidden md:block" aria-hidden>
+          <Bot className="h-28 w-28 text-neutral-800" />
+        </div>
+      )}
 
       {/* Minimal navbar */}
       <div className="w-full sticky top-0 z-30 border-b bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60">
@@ -310,9 +377,9 @@ const TakeInterview = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="h-6 w-6 rounded-md bg-gradient-to-br from-indigo-500 to-cyan-400 shadow" />
-              <span className="font-semibold tracking-tight">Interview Hub</span>
+              <span className="font-semibold tracking-tight">AI Interview Hub</span>
             </div>
-            <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 hidden md:inline-flex">Quick Practice</Badge>
+            <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 hidden md:inline-flex">Test your skills instantly</Badge>
           </div>
         </Container>
       </div>
@@ -320,75 +387,133 @@ const TakeInterview = () => {
       {/* Header area */}
       <div className="section-gradient border-b">
         <Container className="py-6 md:py-10">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight text-gray-900">Take Interview</h1>
-              <p className="text-sm text-muted-foreground mt-2">Choose your domain and topic, answer questions, and get instant feedback.</p>
+            <div className="flex items-center justify-center text-center">
+              <div>
+                <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight text-gray-900">AI Interview Hub</h1>
+                <p className="text-sm text-muted-foreground mt-2">Test your skills instantly. Choose a topic, answer questions, get feedback.</p>
+              </div>
             </div>
-          </div>
         </Container>
       </div>
 
-      <Container className="py-8 md:py-10 space-y-8">
+      <Container className="py-10 md:py-12 space-y-12">
         {/* Setup form */}
         {!started && (
-          <Card className="p-6 glass rounded-2xl shadow-lg">
-            <CardTitle className="text-xl">Setup</CardTitle>
-            <CardDescription className="mt-2">Select what you want to practice</CardDescription>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
-              <div>
-                <Label htmlFor="domain">Domain / Field</Label>
-                <Input
-                  id="domain"
-                  placeholder="e.g., Web Development, Data Science, Java"
-                  value={domain}
-                  onChange={(e) => setDomain(e.target.value)}
-                />
-                <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                  <button type="button" className="px-2 py-1 rounded-md bg-indigo-100 text-indigo-700 border border-indigo-200 hover:bg-indigo-200" onClick={() => setDomain("Web Development")}>Web Development</button>
-                  <button type="button" className="px-2 py-1 rounded-md bg-cyan-100 text-cyan-700 border border-cyan-200 hover:bg-cyan-200" onClick={() => setDomain("Data Science")}>Data Science</button>
-                  <button type="button" className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200" onClick={() => setDomain("Java")}>Java</button>
-                </div>
+          <div className="min-h-screen grid grid-cols-1 md:grid-cols-2 gap-8 items-center py-8">
+            <div className="order-2 md:order-1 space-y-4 px-2 md:px-0">
+              <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-white/70 backdrop-blur border-white/70 text-neutral-700">
+                <span className="h-2 w-2 rounded-full bg-cyan-500"></span>
+                Smart Practice
               </div>
-              <div>
-                <Label htmlFor="topic">Topic</Label>
-                <Input id="topic" placeholder="e.g., React Hooks" value={topic} onChange={(e) => setTopic(e.target.value)} />
-                <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                  <button type="button" className="px-2 py-1 rounded-md bg-indigo-100 text-indigo-700 border border-indigo-200 hover:bg-indigo-200" onClick={() => setTopic("React Hooks")}>React Hooks</button>
-                  <button type="button" className="px-2 py-1 rounded-md bg-cyan-100 text-cyan-700 border border-cyan-200 hover:bg-cyan-200" onClick={() => setTopic("Node.js APIs")}>Node.js APIs</button>
-                  <button type="button" className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200" onClick={() => setTopic("SQL Basics")}>SQL Basics</button>
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="count">Number of Questions</Label>
-                <Input
-                  id="count"
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={count}
-                  onChange={(e) => setCount(Number(e.target.value))}
-                />
-                <div className="mt-2 flex items-center gap-2 text-xs">
-                  {[3,5,7,10].map(n => (
-                    <button key={n} type="button" className={`px-2 py-1 rounded-md border ${count===n ? "bg-neutral-900 text-white border-neutral-900" : "bg-white/70 text-neutral-700 border-neutral-200 hover:bg-white"}`} onClick={() => setCount(n)}>
-                      {n}
-                    </button>
-                  ))}
-                </div>
+              <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight text-gray-900">
+                Ace your next interview with AI
+              </h2>
+              <p className="text-sm md:text-base text-neutral-600 max-w-prose">
+                Generate targeted questions, answer by typing or voice, and get instant, actionable feedback. Modern, fast, and private.
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="px-2 py-1 rounded-md bg-indigo-100 text-indigo-700 border border-indigo-200">Real-time Tips</span>
+                <span className="px-2 py-1 rounded-md bg-cyan-100 text-cyan-700 border border-cyan-200">Voice or Text</span>
+                <span className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 border border-emerald-200">Analytics</span>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 mt-6">
-              <Button variant="soft" onClick={onRestart} className="card-hover">
-                <RefreshCw className="h-4 w-4" /> Reset
-              </Button>
-              <Button variant="gradient" onClick={onStart} className="card-hover" disabled={!domain || !topic || count < 1}>
-                <Rocket className="h-4 w-4" /> Start Interview
-              </Button>
+            <div className="order-1 md:order-2">
+              <Card className="p-8 md:p-10 glass rounded-3xl shadow-xl bg-white/60 backdrop-blur supports-[backdrop-filter]:bg-white/50 border border-white/60 w-full">
+                <CardTitle className="text-xl">Setup</CardTitle>
+                <CardDescription className="mt-2">Select what you want to practice</CardDescription>
+
+                <div className="space-y-6 mt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="domain">Domain / Field</Label>
+                      <Input
+                        id="domain"
+                        placeholder="e.g., Web Development, Data Science, Java"
+                        value={domain}
+                        onChange={(e) => setDomain(e.target.value)}
+                        className="mt-1 bg-white/70 backdrop-blur border border-white/70 shadow-sm focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:border-cyan-300 transition-colors rounded-xl"
+                      />
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <button type="button" className="px-2 py-1 rounded-md bg-indigo-100 text-indigo-700 border border-indigo-200 hover:bg-indigo-200" onClick={() => setDomain("Web Development")}>
+                          Web Development
+                        </button>
+                        <button type="button" className="px-2 py-1 rounded-md bg-cyan-100 text-cyan-700 border border-cyan-200 hover:bg-cyan-200" onClick={() => setDomain("Data Science")}>
+                          Data Science
+                        </button>
+                        <button type="button" className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200" onClick={() => setDomain("Java")}>
+                          Java
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="topic">Topic</Label>
+                      <Input
+                        id="topic"
+                        placeholder="e.g., React Hooks"
+                        value={topic}
+                        onChange={(e) => setTopic(e.target.value)}
+                        className="mt-1 bg-white/70 backdrop-blur border border-white/70 shadow-sm focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:border-cyan-300 transition-colors rounded-xl"
+                      />
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <button type="button" className="px-2 py-1 rounded-md bg-indigo-100 text-indigo-700 border border-indigo-200 hover:bg-indigo-200" onClick={() => setTopic("React Hooks")}>
+                          React Hooks
+                        </button>
+                        <button type="button" className="px-2 py-1 rounded-md bg-cyan-100 text-cyan-700 border border-cyan-200 hover:bg-cyan-200" onClick={() => setTopic("Node.js APIs")}>
+                          Node.js APIs
+                        </button>
+                        <button type="button" className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200" onClick={() => setTopic("SQL Basics")}>
+                          SQL Basics
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="count">Number of Questions</Label>
+                      <Input
+                        id="count"
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={count}
+                        onChange={(e) => setCount(Number(e.target.value))}
+                        className="mt-1 bg-white/70 backdrop-blur border border-white/70 shadow-sm focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:border-cyan-300 transition-colors rounded-xl"
+                      />
+                      <div className="flex items-center gap-2 text-xs">
+                        {[3, 5, 7, 10].map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            className={`px-2 py-1 rounded-md border transition ${
+                              count === n
+                                ? "bg-neutral-900 text-white border-neutral-900 shadow-sm"
+                                : "bg-white/70 text-neutral-700 border-neutral-200 hover:bg-white"
+                            }`}
+                            onClick={() => setCount(n)}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <Button variant="soft" onClick={onRestart} className="card-hover">
+                      <RefreshCw className="h-4 w-4" /> Reset
+                    </Button>
+                    <Button
+                      variant="gradient"
+                      onClick={onStart}
+                      className="card-hover shadow-lg shadow-cyan-200/40 hover:shadow-cyan-300/60 hover:scale-[1.01] transition-transform"
+                      disabled={!domain || !topic || count < 1}
+                    >
+                      <Rocket className="h-4 w-4" /> Start Interview
+                    </Button>
+                  </div>
+                </div>
+              </Card>
             </div>
-          </Card>
+          </div>
         )}
 
         {started && questions.length > 0 && !feedback && (
@@ -397,6 +522,19 @@ const TakeInterview = () => {
             <div className="flex items-center justify-between px-4 py-3 border-b bg-white/60">
               <div className="text-sm text-neutral-600">{progressText}</div>
               <div className="flex items-center gap-2">
+                {/* Countdown timer */}
+                <Badge
+                  className={
+                    secondsLeft <= 10
+                      ? "bg-red-100 text-red-700 border border-red-200"
+                      : secondsLeft <= 30
+                      ? "bg-amber-100 text-amber-700 border border-amber-200"
+                      : "bg-neutral-100 text-neutral-800 border border-neutral-200"
+                  }
+                  title="Time remaining for this question"
+                >
+                  {formatTime(secondsLeft)}
+                </Badge>
                 {isRecording && (
                   <div className="flex items-center gap-2">
                     <span className="relative inline-flex h-2.5 w-2.5">

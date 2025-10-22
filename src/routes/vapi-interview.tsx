@@ -56,7 +56,8 @@ const VapiInterview = () => {
       return;
     }
 
-    if (!vapi) {
+    let clientRef = vapi;
+    if (!clientRef) {
       setStatusMsg("Initializing Vapi client...");
       const client = await createVapiClient();
       setVapi(client);
@@ -65,6 +66,7 @@ const VapiInterview = () => {
         setStatusMsg("Vapi not configured");
         return;
       }
+      clientRef = client;
     }
 
     try {
@@ -78,7 +80,7 @@ const VapiInterview = () => {
     }
 
     setStatusMsg("Starting Vapi call...");
-    await (vapi as VapiController).start({
+    await (clientRef as VapiController).start({
       onPartial: (text) => {
         setAnswers((prev) => {
           const next = [...prev];
